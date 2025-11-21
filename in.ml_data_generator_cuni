@@ -1,0 +1,56 @@
+# ==========================================================
+# LAMMPS Input Script: Data Generation for ML Training
+# System: Copper-Nickel (Cu-Ni) Binary Alloy
+# ==========================================================
+
+# 1. INITIALIZATION & SETUP
+units metal
+boundary p p p             
+atom_style atomic
+dimension 3
+
+# 2. CREATE LATTICE & ATOMS (FCC structure, 10x10x10 supercell, 4000 atoms)
+lattice fcc 3.615
+region box block 0 10 0 10 0 10 units lattice
+create_box 2 box           
+
+# Create 50% Cu and 50% Ni atoms randomly distributed
+create_atoms 1 random 2000 86523 box
+create_atoms 2 random 2000 37194 box
+
+# Set masses
+mass 1 63.546  # Copper
+mass 2 58.693  # Nickel
+
+# 3. POTENTIAL SETUP 
+pair_style eam/alloy
+pair_coeff * * CuNi.eam.alloy Cu Ni 
+
+# 4. DEFINE VARIABLES FOR ML
+variable step equal step
+variable temp equal temp
+variable press equal press
+variable vol equal vol
+variable dens equal density
+variable poteng equal pe/atoms 
+
+# 5. RELAXATION
+minimize 1.0e-6 1.0e-6 10000 100000
+
+# 6. NPT EQUILIBRATION
+velocity all create 1000 49284 mom yes rot yes
+fix 1 all npt temp 1000.0 1000.0 0.1 iso 0.0001 0.0001 1.0
+
+# 7. PRINT DATA FOR ML TRAINING
+# Format: Step Temp Pressure Volume Density PotEng
+fix 2 all ave/time 100 1 100 v_step v_temp v_press v_vol v_dens v_poteng file ML_CuNi_Training_Data.txt
+
+
+run 100000
+
+# 8. CLEANUP
+unfix 1
+unfix 2
+
+print "ML data generation complete. File: ML_CuNi_Training_Data.txt"
+
